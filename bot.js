@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 
 const client = new Client({
   intents: [
@@ -17,21 +17,10 @@ const warningTimeout = parseInt(process.env.WARNING_TIMEOUT);
 const warnedUsers = new Map();
 
 client.on('ready', () => {
-  console.log(`Logged in as ${client.user.tag}!`);
-});
-
-client.on('error', (error) => {
-  console.error('The bot encountered an error:', error);
+  console.log(`🤖 BOTCAM 24h está online como ${client.user.tag}`);
 });
 
 client.on('voiceStateUpdate', async (oldState, newState) => {
-  console.log(
-    `Voice state update detected for user ${newState.member?.user.tag}. 
-    Old Channel: ${oldState.channelId}, 
-    New Channel: ${newState.channelId}, 
-    Camera On: ${newState.selfVideo}`
-  );
-
   if (!newState.channelId) return;
   if (!cameraOnChannels.includes(newState.channelId)) return;
 
@@ -42,9 +31,6 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 
   // Entrou no canal monitorado com câmera desligada
   if (newState.channelId !== oldState.channelId && !newState.selfVideo) {
-    console.log(
-      `User ${member.user.tag} joined the monitored channel "${channel.name}" without camera enabled.`
-    );
     handleCameraOff(member, channel);
   }
 
@@ -54,45 +40,52 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     !newState.selfVideo &&
     !warnedUsers.has(member.id)
   ) {
-    console.log(
-      `User ${member.user.tag} disabled their camera in the monitored channel "${channel.name}".`
-    );
     handleCameraOff(member, channel);
   }
 
   // Ligou a câmera
   else if (newState.selfVideo && warnedUsers.has(member.id)) {
-    console.log(
-      `User ${member.user.tag} enabled their camera in the monitored channel "${channel.name}".`
-    );
     clearWarning(member.id);
   }
 });
 
 async function handleCameraOff(member, channel) {
   try {
-    const warningMessage = await member.send(
-      `📷 Attention! Please enable your camera in the channel "**${channel.name}**" within the next ${warningTimeout / 1000} seconds, or you will be removed from the channel. 🚨`
-    );
+    const embed = new EmbedBuilder()
+      .setColor(0xff0000)
+      .setTitle("📷 Atenção!")
+      .setDescription(
+        `Você entrou no canal **${channel.name}** com a câmera desligada.\n\n` +
+        `Por favor, ative sua câmera nos próximos **${warningTimeout / 1000} segundos**.\n` +
+        `Caso contrário, você será removido(a) automaticamente do canal. 🚨`
+      )
+      .setFooter({ text: "BOTCAM 24h • Monitoramento de Câmera" })
+      .setTimestamp();
 
-    console.log(`Sent warning message to user ${member.user.tag}.`);
+    const warningMessage = await member.send({ embeds: [embed] });
 
     const timeoutId = setTimeout(async () => {
       if (!member.voice.selfVideo) {
         await member.voice.disconnect();
-        await member.send(
-          `❌ You have been removed from the channel "**${channel.name}**" due to not enabling your camera. Please rejoin the channel and enable your camera to participate. 🙏`
-        );
-        console.log(
-          `User ${member.user.tag} was removed from the channel "${channel.name}" for not enabling their camera.`
-        );
+
+        const removeEmbed = new EmbedBuilder()
+          .setColor(0x8b0000)
+          .setTitle("❌ Remoção automática")
+          .setDescription(
+            `Você foi removido(a) do canal **${channel.name}** por não ativar a câmera a tempo.\n\n` +
+            `Entre novamente e ligue sua câmera para participar. 🙏`
+          )
+          .setFooter({ text: "BOTCAM 24h • Regras da Comunidade" })
+          .setTimestamp();
+
+        await member.send({ embeds: [removeEmbed] });
       }
     }, warningTimeout);
 
     warnedUsers.set(member.id, { timeoutId, warningMessage });
-    console.log(`Set timeout for user ${member.user.tag}.`);
+
   } catch (error) {
-    console.error('Error handling camera off:', error);
+    console.error('Erro ao lidar com câmera desligada:', error);
   }
 }
 
@@ -101,18 +94,18 @@ async function clearWarning(memberId) {
   if (userInfo) {
     clearTimeout(userInfo.timeoutId);
     warnedUsers.delete(memberId);
-    console.log(`Cleared warning for user with ID ${memberId}.`);
 
     try {
-      await userInfo.warningMessage.edit(
-        `✨ Thank you for enabling your camera! Your cooperation is appreciated. 😊👍`
-      );
-      console.log(`Edited warning message for user with ID ${memberId}.`);
-    } catch (editError) {
-      console.error(
-        `Failed to edit warning message for user with ID ${memberId}:`,
-        editError
-      );
+      const successEmbed = new EmbedBuilder()
+        .setColor(0x00ff00)
+        .setTitle("✨ Perfeito!")
+        .setDescription("Obrigada por ativar sua câmera! 😊👍")
+        .setFooter({ text: "BOTCAM 24h • Tudo certo agora!" })
+        .setTimestamp();
+
+      await userInfo.warningMessage.edit({ embeds: [successEmbed] });
+    } catch (error) {
+      console.error('Erro ao editar mensagem de aviso:', error);
     }
   }
 }
