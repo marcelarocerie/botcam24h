@@ -1,0 +1,11 @@
+{
+  "name": "rxbot",
+  "version": "1.0.0",
+  "description": "A Swiss Army Knife Utility Bot",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "discord.js": "^12.5.3"
+  }
